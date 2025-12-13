@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gesture Controlled Car 3D</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        #container { position: relative; width: 100vw; height: 100vh; }
+        #video-container {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 240px;
+            height: 180px;
+            border: 2px solid white;
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 10;
+            transform: scaleX(-1); /* Mirror the video */
+        }
+        #webcam { width: 100%; height: 100%; object-fit: cover; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.5);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h1>Hand Drive 3D</h1>
+        <p>Move your hand left/right to steer</p>
+        <p id="status">Loading AI Models...</p>
+    </div>
+
+    <div id="video-container">
+        <video id="webcam" autoplay playsinline></video>
+    </div>
+
+    <div id="container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GestureRecognizer, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
+        // --- Variables ---
+        let gestureRecognizer;
+        let webcamElement = document.getElementById("webcam");
+        let lastVideoTime = -1;
+        let car;
+        let targetX = 0;
+
+        // --- 1. Setup Three.js Scene ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Sky blue
+        scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(5, 10, 5);
+        scene.add(dirLight);
+
+        // Ground/Road
+        const planeGeo = new THREE.PlaneGeometry(100, 1000);
+        const planeMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const ground = new THREE.Mesh(planeGeo, planeMat);
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        // Create a simple Car Model
+        const carGroup = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.BoxGeometry(2, 0.8, 4), new THREE.MeshStandardMaterial({color: 0xff0000}));
+        body.position.y = 0.6;
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.7, 2), new THREE.MeshStandardMaterial({color: 0xffffff}));
+        cabin.position.y = 1.3;
+        cabin.position.z = -0.2;
+        carGroup.add(body, cabin);
+        scene.add(carGroup);
+        car = carGroup;
+
+        camera.position.set(0, 5, 10);
+        camera.lookAt(car.position);
+
+        // --- 2. Setup Hand Tracking ---
+        async function initHandTracking() {
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+            gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
+                    delegate: "GPU"
+                },
+                runningMode: "VIDEO",
+                numHands: 1
+            });
+            
+            startWebcam();
+        }
+
+        async function startWebcam() {
+            const constraints = { video: true };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            webcamElement.srcObject = stream;
+            webcamElement.addEventListener("loadeddata", () => {
+                document.getElementById('status').innerText = "System Ready: Show your hand!";
+                animate();
+            });
+        }
+
+        // --- 3. Animation Loop ---
+        function animate() {
+            // Update Gesture Recognition
+            if (webcamElement.currentTime !== lastVideoTime) {
+                lastVideoTime = webcamElement.currentTime;
+                const results = gestureRecognizer.recognizeVideo(webcamElement, Date.now());
+
+                if (results.landmarks && results.landmarks.length > 0) {
+                    // landmark 9 is the middle of the palm
+                    const handX = results.landmarks[0][9].x; 
+                    // Map 0-1 from camera to -10 to 10 on road
+                    // Inverted (1 - handX) because video is mirrored
+                    targetX = ((1 - handX) - 0.5) * 20;
+                }
+            }
+
+            // Smooth car movement (Lerp)
+            car.position.x += (targetX - car.position.x) * 0.1;
+            car.rotation.z = -(targetX - car.position.x) * 0.2; // Tilt car while turning
+            
+            // Move camera with car
+            camera.position.x = car.position.x * 0.5;
+            camera.lookAt(car.position);
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        initHandTracking();
+    </script>
+</body>
+</html>
