@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Telemetry & Analytics Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="logo-area">
+                <h1><span class="f1-red">F1</span> Analytics</h1>
+            </div>
+            
+            <div class="control-group">
+                <label for="year">Season</label>
+                <select id="year" onchange="loadSchedule()"></select>
+            </div>
+
+            <div class="control-group">
+                <label for="race">Grand Prix</label>
+                <select id="race" disabled>
+                    <option>Loading schedule...</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="sessionType">Session</label>
+                <select id="sessionType">
+                    <option value="R">Race</option>
+                    <option value="Q">Qualifying</option>
+                    <option value="FP3">Practice 3</option>
+                    <option value="FP2">Practice 2</option>
+                    <option value="FP1">Practice 1</option>
+                </select>
+            </div>
+
+            <button class="btn-primary" onclick="loadSession()" id="loadBtn">
+                Load Session Data
+            </button>
+            <p id="statusMsg" class="status-msg"></p>
+        </aside>
+
+        <main class="main-content" id="dashboardContent" style="display: none;">
+            <header class="top-bar">
+                <h2 id="dashboardTitle">Session Overview</h2>
+                <button class="btn-secondary" onclick="exportCSV()">Download CSV</button>
+            </header>
+
+            <div class="bento-grid">
+                <div class="card stat-card highlight-card">
+                    <h3>Fastest Lap</h3>
+                    <div class="stat-value" id="flDriver">--</div>
+                    <div class="stat-sub" id="flTime">--</div>
+                    <div class="stat-sub" id="flLap">Lap --</div>
+                </div>
+
+                <div class="card table-card">
+                    <h3>Top Results</h3>
+                    <div class="table-responsive">
+                        <table id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>Driver</th>
+                                    <th>Team</th>
+                                    <th>Grid</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card control-card">
+                    <h3>Telemetry Duel</h3>
+                    <div class="duel-inputs">
+                        <input type="text" id="driver1" placeholder="Driver 1 (e.g. VER)" value="VER">
+                        <span class="vs">VS</span>
+                        <input type="text" id="driver2" placeholder="Driver 2 (e.g. LEC)" value="LEC">
+                    </div>
+                    <button class="btn-primary full-width" onclick="loadTelemetry()">Generate Charts</button>
+                </div>
+
+                <div class="card chart-card full-span">
+                    <div id="telemetryChart" class="plot-container"></div>
+                </div>
+                
+                <div class="card chart-card full-span">
+                    <div id="trackMapChart" class="plot-container"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/main.js"></script>
+</body>
+</html>
